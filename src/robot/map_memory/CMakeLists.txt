@@ -11,8 +11,14 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Search for dependencies required for building this package
-find_package(ament_cmake REQUIRED) # ROS2 build tool
-find_package(rclcpp REQUIRED)      # ROS2 C++ package
+
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 # Compiles source files into a library
 # A library is not executed, instead other executables can link
@@ -27,12 +33,25 @@ target_include_directories(map_memory_lib
 # Add ROS2 dependencies required by package
 ament_target_dependencies(map_memory_lib 
   rclcpp
+  nav_msgs
+  geometry_msgs
+  tf2
+  tf2_geometry_msgs
+  tf2_ros
 )
+
 
 # Create ROS2 node executable from source files
 add_executable(map_memory_node src/map_memory_node.cpp)
-# Link to the previously built library to access map_memory classes and methods
 target_link_libraries(map_memory_node map_memory_lib)
+ament_target_dependencies(map_memory_node 
+  rclcpp
+  nav_msgs
+  geometry_msgs
+  tf2
+  tf2_geometry_msgs
+  tf2_ros
+)
 
 # Copy executable to installation location
 install(TARGETS
