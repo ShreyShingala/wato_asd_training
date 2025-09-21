@@ -23,7 +23,35 @@ void PurePursuitController::controlLoop() {
     if (!current_path_ || !robot_odom_ || current_path_->poses.empty()) {
         return;
     }
-    auto lookahead_point = core_.findLookaheadPoint(*current_path_, *robot_odom_, lookahead_distance_);
+    // Loosen pruning: only remove points far behind, always keep at least the closest point
+    nav_msgs::msg::Path pruned_path = *current_path_;
+    const auto &robot_pose = robot_odom_->pose.pose;
+    double robot_yaw = core_.extractYaw(robot_pose.orientation);
+    const auto &robot_pos = robot_pose.position;
+    auto &poses = pruned_path.poses;
+    // Find the first point that is not far behind (dot > -0.5)
+    auto keep_from = poses.begin();
+    for (auto it = poses.begin(); it != poses.end(); ++it) {
+        double dx = it->pose.position.x - robot_pos.x;
+        double dy = it->pose.position.y - robot_pos.y;
+        double heading_x = std::cos(robot_yaw);
+        double heading_y = std::sin(robot_yaw);
+        double dot = dx * heading_x + dy * heading_y;
+        if (dot > -0.5) {
+            keep_from = it;
+            break;
+        }
+    }
+    // Always keep at least the closest point
+    if (keep_from != poses.begin()) {
+        poses.erase(poses.begin(), keep_from);
+    }
+    if (poses.empty()) {
+        geometry_msgs::msg::Twist stop;
+        cmd_vel_pub_->publish(stop);
+        return;
+    }
+    auto lookahead_point = core_.findLookaheadPoint(pruned_path, *robot_odom_, lookahead_distance_);
     if (!lookahead_point) {
         // Stop if no valid lookahead point
         geometry_msgs::msg::Twist stop;
@@ -31,7 +59,7 @@ void PurePursuitController::controlLoop() {
         return;
     }
     // Check if goal reached
-    const auto &goal = current_path_->poses.back().pose.position;
+    const auto &goal = pruned_path.poses.back().pose.position;
     const auto &robot = robot_odom_->pose.pose.position;
     if (core_.computeDistance(goal, robot) < goal_tolerance_) {
         geometry_msgs::msg::Twist stop;

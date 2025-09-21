@@ -22,8 +22,10 @@ CellIndex worldToMap(double x, double y, const nav_msgs::msg::OccupancyGrid &map
   const double res = map.info.resolution;
   const double ox  = map.info.origin.position.x;
   const double oy  = map.info.origin.position.y;
-  int mx = static_cast<int>((x - ox) / res);
-  int my = static_cast<int>((y - oy) / res);
+
+  // Use floor to handle negative coordinates correctly
+  int mx = static_cast<int>(std::floor((x - ox) / res));
+  int my = static_cast<int>(std::floor((y - oy) / res));
   return CellIndex(mx, my);
 }
 
@@ -46,6 +48,7 @@ bool isFree(const nav_msgs::msg::OccupancyGrid &map, const CellIndex &c, int8_t 
   const int idx = flatIndex(map, c);
   const int8_t v = map.data[idx];
   // Treat unknown (-1) as free, and anything below threshold as free
+  // v is signed int8_t; unknown is -1; occupied values are 0..100
   return (v < 0) || (v < occ_thresh);
 }
 
@@ -89,7 +92,8 @@ nav_msgs::msg::Path aStarSearch(const nav_msgs::msg::OccupancyGrid &map,
   const CellIndex goal_seed  = worldToMap(goal_point.x,             goal_point.y,             map);
 
   if (!inBounds(map, start_seed) || !inBounds(map, goal_seed)) {
-    return path; // out of bounds
+    // Either start or goal outside the grid
+    return path;
   }
 
   // Relocate start/goal to nearest free cell within a small radius
@@ -101,7 +105,7 @@ nav_msgs::msg::Path aStarSearch(const nav_msgs::msg::OccupancyGrid &map,
   std::priority_queue<AStarNode, std::vector<AStarNode>, CompareF> open_set;
   std::unordered_map<CellIndex, CellIndex, CellIndexHash> came_from;
   std::unordered_map<CellIndex, double, CellIndexHash> g_score;
-  std::unordered_set<int> closed; // by flat index
+  std::unordered_set<int> closed; // track by flat index
 
   auto heuristic = [&](const CellIndex &a, const CellIndex &b) {
     // Euclidean in grid units
@@ -111,30 +115,52 @@ nav_msgs::msg::Path aStarSearch(const nav_msgs::msg::OccupancyGrid &map,
   g_score[start] = 0.0;
   open_set.emplace(start, heuristic(start, goal));
 
-  // 4-connected neighbors
-  const CellIndex dirs[4] = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+  // 8-connected neighbors (diagonals allowed)
+  const std::vector<std::pair<CellIndex, double>> dirs = {
+    {{1,0}, 1.0}, {{-1,0}, 1.0}, {{0,1}, 1.0}, {{0,-1}, 1.0},
+    {{1,1}, std::sqrt(2.0)}, {{-1,1}, std::sqrt(2.0)}, {{1,-1}, std::sqrt(2.0)}, {{-1,-1}, std::sqrt(2.0)}
+  };
 
+  CellIndex reached = start;
+  double min_goal_dist = std::numeric_limits<double>::max();
   while (!open_set.empty())
   {
     const CellIndex current = open_set.top().index;
     open_set.pop();
 
+    double goal_dist = heuristic(current, goal);
+    if (goal_dist < min_goal_dist) {
+      min_goal_dist = goal_dist;
+      reached = current;
+    }
+
+    // If reached goal cell, stop exploring
     if (current == goal) {
-      break; // found a route to goal
+      reached = goal;
+      break;
     }
 
     const int cFlat = flatIndex(map, current);
     if (closed.count(cFlat)) continue;
     closed.insert(cFlat);
 
-    for (const auto &d : dirs)
+    for (const auto &dir : dirs)
     {
+      const CellIndex &d = dir.first;
+      double move_cost = dir.second;
       CellIndex nb{current.x + d.x, current.y + d.y};
       if (!inBounds(map, nb)) continue;
 
       if (!isFree(map, nb, occ_thresh)) continue;
 
-      const double tentative_g = g_score[current] + 1.0; // unit step cost
+      // For diagonal moves, check that both adjacent cardinal cells are also free (no corner cutting)
+      if (std::abs(d.x) == 1 && std::abs(d.y) == 1) {
+        CellIndex adj1{current.x + d.x, current.y};
+        CellIndex adj2{current.x, current.y + d.y};
+        if (!isFree(map, adj1, occ_thresh) || !isFree(map, adj2, occ_thresh)) continue;
+      }
+
+      const double tentative_g = g_score[current] + move_cost;
       auto it = g_score.find(nb);
       if (it == g_score.end() || tentative_g < it->second) {
         came_from[nb] = current;
@@ -145,15 +171,15 @@ nav_msgs::msg::Path aStarSearch(const nav_msgs::msg::OccupancyGrid &map,
     }
   }
 
-  // Reconstruct path if we reached the goal
-  if (came_from.find(goal) == came_from.end() && !(start == goal)) {
-    // Could not reach goal
+
+  // Reconstruct path from the actual reached cell (may not be the goal if unreachable)
+  if (came_from.find(reached) == came_from.end() && !(start == reached)) {
+    // Could not reach any cell
     return path;
   }
 
-  // Build reverse path
   std::vector<CellIndex> rev;
-  CellIndex cur = goal;
+  CellIndex cur = reached;
   rev.push_back(cur);
   while (cur != start) {
     auto it = came_from.find(cur);
