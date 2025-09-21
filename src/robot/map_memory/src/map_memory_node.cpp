@@ -53,7 +53,7 @@ void MapMemoryNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
 
     double distance = computeDistance(new_x, new_y, last_x_, last_y_);
 
-    RCLCPP_INFO(this->get_logger(), "Odometry update: x=%.2f, y=%.2f, distance since last=%.2f", new_x, new_y, distance);
+    //RCLCPP_INFO(this->get_logger(), "Odometry update: x=%.2f, y=%.2f, distance since last=%.2f", new_x, new_y, distance);
 
     heading_ = msg->pose.pose.orientation;
 
