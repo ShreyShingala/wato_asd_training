@@ -32,6 +32,10 @@ private:
   geometry_msgs::msg::Pose robot_pose_;
   bool goal_received_ = false;
 
+  // Timing and goal tracking
+  rclcpp::Time goal_start_time_;
+  double timeout_sec_ = 10.0;
+
 
   // Callbacks
   void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);

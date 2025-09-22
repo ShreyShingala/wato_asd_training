@@ -1,3 +1,24 @@
+#include <nav_msgs/msg/occupancy_grid.hpp>
+#include <nav_msgs/msg/path.hpp>
+#include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <rclcpp/rclcpp.hpp>
+
+namespace planner_core {
+// Returns true if robot has reached the goal
+bool goalReached(const geometry_msgs::msg::Pose& robot_pose, const geometry_msgs::msg::PointStamped& goal);
+// Logs occupancy at start and goal
+void logStartGoalOccupancy(const nav_msgs::msg::OccupancyGrid& map, const geometry_msgs::msg::Pose& robot_pose, const geometry_msgs::msg::PointStamped& goal, rclcpp::Logger logger);
+// Plans path and publishes result
+void planPath(
+  bool goal_received,
+  const nav_msgs::msg::OccupancyGrid& map,
+  const geometry_msgs::msg::Pose& robot_pose,
+  const geometry_msgs::msg::PointStamped& goal,
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub,
+  rclcpp::Clock::SharedPtr clock,
+  rclcpp::Logger logger);
+}
 #ifndef PLANNER_CORE_HPP_
 #define PLANNER_CORE_HPP_
 
