@@ -57,7 +57,7 @@ void CostmapCore::processLaserScan(const sensor_msgs::msg::LaserScan::SharedPtr&
 void CostmapCore::inflateObstacles() {
     std::vector<std::vector<int>> inflatedGrid = grid_;
 
-    const double inflation_radius = 1.0; // meters
+    const double inflation_radius = 2.0; // meters
     const int inflation_cells = static_cast<int>(std::ceil(inflation_radius / resolution_));
     const int max_inflate_cost = max_cost_;
 
