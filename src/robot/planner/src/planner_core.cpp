@@ -92,10 +92,9 @@ nav_msgs::msg::Path aStarSearch(const nav_msgs::msg::OccupancyGrid &map,
     return path; // out of bounds
   }
 
-  // Relocate start/goal to nearest free cell within a small radius
+  // Use start/goal as-is (no robust relocation)
   CellIndex start = start_seed, goal = goal_seed;
-  if (!findNearestFree(map, start_seed, 3, start, occ_thresh)) return path;
-  if (!findNearestFree(map, goal_seed,  3, goal,  occ_thresh)) return path;
+  if (!isFree(map, start, occ_thresh) || !isFree(map, goal, occ_thresh)) return path;
 
   // A* setup
   std::priority_queue<AStarNode, std::vector<AStarNode>, CompareF> open_set;
