@@ -9,12 +9,11 @@ namespace robot
 class MapMemoryCore {
   public:
     explicit MapMemoryCore(const rclcpp::Logger& logger);
-    
 
   private:
     rclcpp::Logger logger_;
 };
 
-} 
+}  
 
 #endif  
